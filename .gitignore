@@ -72,3 +72,4 @@ Thumbs.db
 
 # ── Cloned repos (tmp project dirs) ──────────────────────────────────────────
 backend/tmp/
+.continue/
