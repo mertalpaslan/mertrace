@@ -8,7 +8,7 @@ from litellm import acompletion
 
 from app.rag.context_assembler import AssembledContext
 from app.core.config import settings
-from app.core.logging import get_logger
+from app.core.logging import get_logger, log_llm_request, log_llm_response
 
 logger = get_logger(__name__)
 
@@ -33,15 +33,17 @@ async def synthesize_stream(
     messages = _build_messages(query, context, conversation_history)
 
     t0 = time.monotonic()
-    total_tokens = 0
+    full_response = ""
+
+    extra: dict = {}
+    if settings.llm_api_base:
+        extra["api_base"] = settings.llm_api_base
+    if settings.llm_api_key:
+        extra["api_key"] = settings.llm_api_key
+
+    request_id = log_llm_request(model, messages)
 
     try:
-        extra: dict = {}
-        if settings.llm_api_base:
-            extra["api_base"] = settings.llm_api_base
-        if settings.llm_api_key:
-            extra["api_key"] = settings.llm_api_key
-
         response = await acompletion(
             model=model,
             messages=messages,
@@ -54,18 +56,16 @@ async def synthesize_stream(
         async for chunk in response:
             delta = chunk.choices[0].delta
             if delta and delta.content:
+                full_response += delta.content
                 yield delta.content
-                total_tokens += 1
 
         duration_ms = int((time.monotonic() - t0) * 1000)
-        logger.info(
-            "Synthesis complete",
-            extra={
-                "model": model,
-                "tokens_approx": total_tokens,
-                "context_tokens": context.estimated_tokens,
-                "duration_ms": duration_ms,
-            },
+        log_llm_response(
+            request_id=request_id,
+            model=model,
+            content=full_response,
+            duration_ms=duration_ms,
+            finish_reason="stop",
         )
 
     except Exception as e:

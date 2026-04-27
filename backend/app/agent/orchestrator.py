@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import AsyncGenerator
 from typing import Callable
 
@@ -9,6 +10,16 @@ from litellm import acompletion
 from app.agent.tools import TOOL_SCHEMAS, run_tool, ToolResult
 from app.agent.memory import ConversationMemory
 from app.core.config import settings
+from app.core.logging import get_logger, log_llm_request, log_llm_response
+
+logger = get_logger(__name__)
+
+SYSTEM_PROMPT = """You are an expert code assistant with access to tools for exploring a software project.
+Use tools to gather precise information before answering.
+Always cite specific files and line numbers in your final answer.
+Be concise and technical. Do not guess — use tools to verify."""
+
+MAX_TOOL_ROUNDS = 3
 
 
 def _llm_extra() -> dict:
@@ -19,16 +30,6 @@ def _llm_extra() -> dict:
     if settings.llm_api_key:
         extra["api_key"] = settings.llm_api_key
     return extra
-from app.core.logging import get_logger
-
-logger = get_logger(__name__)
-
-SYSTEM_PROMPT = """You are an expert code assistant with access to tools for exploring a software project.
-Use tools to gather precise information before answering.
-Always cite specific files and line numbers in your final answer.
-Be concise and technical. Do not guess — use tools to verify."""
-
-MAX_TOOL_ROUNDS = 3  # max tool call rounds per query
 
 
 async def run_agent(
@@ -43,12 +44,7 @@ async def run_agent(
       1. LLM decides which tools to call
       2. Execute tools, collect results
       3. Single-pass LLM synthesis with tool results
-
-    Streams tokens via async generator.
-    Emits agent.tool_start / agent.tool_done events via emit().
     """
-    import chromadb as _chromadb
-
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         *memory.to_messages(max_turns=6),
@@ -59,6 +55,10 @@ async def run_agent(
 
     # ── Step 1 & 2: Tool calling rounds ──────────────────────────────────────
     for round_num in range(MAX_TOOL_ROUNDS):
+        rid = log_llm_request(
+            settings.litellm_model, messages, tools=_build_tool_specs()
+        )
+        t0 = time.monotonic()
         response = await acompletion(
             model=settings.litellm_model,
             messages=messages,
@@ -69,29 +69,42 @@ async def run_agent(
             stream=False,
             **_llm_extra(),
         )
-
+        duration_ms = int((time.monotonic() - t0) * 1000)
         msg = response.choices[0].message
         tool_calls = getattr(msg, "tool_calls", None) or []
+        log_llm_response(
+            request_id=rid,
+            model=settings.litellm_model,
+            content=msg.content or "",
+            input_tokens=getattr(response.usage, "prompt_tokens", 0),
+            output_tokens=getattr(response.usage, "completion_tokens", 0),
+            duration_ms=duration_ms,
+            finish_reason=response.choices[0].finish_reason or "",
+            tool_calls=[
+                {"function": {"name": tc.function.name, "arguments": tc.function.arguments}}
+                for tc in tool_calls
+            ],
+        )
 
         if not tool_calls:
-            # No more tools needed — proceed to synthesis
             break
 
-        # Add assistant message with tool calls to context
-        messages.append({"role": "assistant", "content": msg.content or "",
-                         "tool_calls": [
-                             {
-                                 "id": tc.id,
-                                 "type": "function",
-                                 "function": {
-                                     "name": tc.function.name,
-                                     "arguments": tc.function.arguments,
-                                 },
-                             }
-                             for tc in tool_calls
-                         ]})
+        messages.append({
+            "role": "assistant",
+            "content": msg.content or "",
+            "tool_calls": [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    },
+                }
+                for tc in tool_calls
+            ],
+        })
 
-        # Execute each tool call
         for tc in tool_calls:
             tool_name = tc.function.name
             try:
@@ -99,13 +112,11 @@ async def run_agent(
             except json.JSONDecodeError:
                 tool_input = {}
 
-            # Emit tool start event
             await emit("agent.tool_start", {
                 "tool_name": tool_name,
                 "tool_input": tool_input,
             })
 
-            # Run tool in executor (may do file I/O)
             import asyncio
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(
@@ -113,19 +124,20 @@ async def run_agent(
             )
             tool_results.append(result)
 
-            # Emit tool done event
             await emit("agent.tool_done", result.to_ws_payload())
 
-            # Add tool result to messages
-            output_str = json.dumps(result.output) if not isinstance(result.output, str) \
+            output_str = (
+                json.dumps(result.output)
+                if not isinstance(result.output, str)
                 else result.output
+            )
             if result.error:
                 output_str = f"Error: {result.error}"
 
             messages.append({
                 "role": "tool",
                 "tool_call_id": tc.id,
-                "content": output_str[:4000],  # cap tool output
+                "content": output_str[:4000],
             })
 
         logger.debug(
@@ -134,7 +146,6 @@ async def run_agent(
         )
 
     # ── Step 3: Final synthesis with streaming ────────────────────────────────
-    # Add synthesis instruction
     messages.append({
         "role": "user",
         "content": (
@@ -143,6 +154,8 @@ async def run_agent(
         ) if tool_results else query,
     })
 
+    syn_rid = log_llm_request(settings.litellm_model, messages)
+    t0 = time.monotonic()
     stream_response = await acompletion(
         model=settings.litellm_model,
         messages=messages,
@@ -159,7 +172,14 @@ async def run_agent(
             full_response += delta.content
             yield delta.content
 
-    # Store in memory
+    log_llm_response(
+        request_id=syn_rid,
+        model=settings.litellm_model,
+        content=full_response,
+        duration_ms=int((time.monotonic() - t0) * 1000),
+        finish_reason="stop",
+    )
+
     memory.add_user(query)
     memory.add_assistant(full_response)
 

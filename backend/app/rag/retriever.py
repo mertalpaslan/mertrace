@@ -7,7 +7,7 @@ import chromadb
 from rank_bm25 import BM25Okapi
 
 from app.ingestion.embedder import query_collection, collection_name
-from app.core.logging import get_logger
+from app.core.logging import get_logger, log_retrieval
 
 logger = get_logger(__name__)
 
@@ -63,14 +63,25 @@ def retrieve(
         [semantic_results, bm25_results], top_k=top_k
     )
 
-    logger.debug(
-        "Retrieval complete",
-        extra={
-            "project_id": project_id,
-            "semantic": len(semantic_results),
-            "bm25": len(bm25_results),
-            "fused": len(fused),
-        },
+    top_chunks = [
+        {
+            "file_path": c.file_path,
+            "start_line": c.start_line,
+            "symbol_name": c.symbol_name,
+            "chunk_type": c.chunk_type,
+            "score": c.score,
+            "text": c.text,
+        }
+        for c in fused[:5]
+    ]
+    log_retrieval(
+        project_id=project_id,
+        query=query,
+        semantic_count=len(semantic_results),
+        bm25_count=len(bm25_results),
+        fused_count=len(fused),
+        reranked_count=len(fused),
+        top_chunks=top_chunks,
     )
     return fused
 

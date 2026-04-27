@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+import time
+import uuid
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
@@ -41,6 +43,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Request logging middleware ────────────────────────────────────────────────
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    rid = uuid.uuid4().hex[:8]
+    t0 = time.monotonic()
+    response = await call_next(request)
+    duration_ms = int((time.monotonic() - t0) * 1000)
+    # Skip health check spam in non-debug mode
+    if settings.debug or request.url.path != "/api/health":
+        logger.info(
+            f"{request.method} {request.url.path}",
+            extra={
+                "request_id": rid,
+                "method": request.method,
+                "path": request.url.path,
+                "status": response.status_code,
+                "duration_ms": duration_ms,
+            },
+        )
+    return response
+
 
 # ── Routers ────────────────────────────────────────────────────────────────────
 app.include_router(projects.router, prefix="/api")
