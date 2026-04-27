@@ -1,0 +1,74 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+.env.local
+
+# ── uv ────────────────────────────────────────────────────────────────────────
+.uv/
+
+# ── Environment / secrets ─────────────────────────────────────────────────────
+.env
+*.env
+!env.example
+
+# ── Data & storage (generated at runtime) ────────────────────────────────────
+data/
+logs/
+/tmp/
+
+# ── ChromaDB ──────────────────────────────────────────────────────────────────
+chroma/
+*.chroma
+
+# ── SQLite ────────────────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+node_modules/
+dist/
+.vite/
+*.local
+
+# ── TypeScript ────────────────────────────────────────────────────────────────
+*.tsbuildinfo
+
+# ── Test & coverage ───────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+.ruff_cache/
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+*.override.yml
+
+# ── ML model cache ────────────────────────────────────────────────────────────
+/tmp/flashrank/
+/tmp/codebase_analyzer/
+.cache/
+
+# ── Cloned repos (tmp project dirs) ──────────────────────────────────────────
+backend/tmp/
