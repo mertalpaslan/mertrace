@@ -9,6 +9,16 @@ from litellm import acompletion
 from app.agent.tools import TOOL_SCHEMAS, run_tool, ToolResult
 from app.agent.memory import ConversationMemory
 from app.core.config import settings
+
+
+def _llm_extra() -> dict:
+    """Extra kwargs for LiteLLM when a custom provider is configured."""
+    extra: dict = {}
+    if settings.llm_api_base:
+        extra["api_base"] = settings.llm_api_base
+    if settings.llm_api_key:
+        extra["api_key"] = settings.llm_api_key
+    return extra
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -57,6 +67,7 @@ async def run_agent(
             temperature=0.1,
             max_tokens=1024,
             stream=False,
+            **_llm_extra(),
         )
 
         msg = response.choices[0].message
@@ -138,6 +149,7 @@ async def run_agent(
         stream=True,
         temperature=0.2,
         max_tokens=2048,
+        **_llm_extra(),
     )
 
     full_response = ""

@@ -36,12 +36,19 @@ async def synthesize_stream(
     total_tokens = 0
 
     try:
+        extra: dict = {}
+        if settings.llm_api_base:
+            extra["api_base"] = settings.llm_api_base
+        if settings.llm_api_key:
+            extra["api_key"] = settings.llm_api_key
+
         response = await acompletion(
             model=model,
             messages=messages,
             stream=True,
             temperature=0.2,
             max_tokens=2048,
+            **extra,
         )
 
         async for chunk in response:

@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     max_context_tokens: int = 4000
 
+    # Custom OpenAI-compatible provider
+    # Set llm_api_base to your provider URL, e.g. https://api.together.xyz/v1
+    # Set llm_api_key to your provider API key
+    # Set litellm_model to openai/<model-name> for OpenAI-compatible APIs
+    llm_api_base: str = ""   # e.g. https://api.together.xyz/v1
+    llm_api_key: str = ""    # provider API key (overrides openai_api_key when set)
+
     # ChromaDB
     chroma_persist_dir: str = str(BASE_DIR.parent / "data" / "chroma")
 
