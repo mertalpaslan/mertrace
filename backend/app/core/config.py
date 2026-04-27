@@ -2,12 +2,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent  # backend/
+REPO_ROOT = BASE_DIR.parent  # repo root
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=BASE_DIR / ".env",
+        env_file=[REPO_ROOT / ".env", BASE_DIR / ".env"],  # repo root first, backend/ fallback
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -21,7 +22,7 @@ class Settings(BaseSettings):
     backend_port: int = 8000
 
     # LLM
-    litellm_model: str = "claude-haiku-3-5"
+    litellm_model: str = ""
     anthropic_api_key: str = ""
     openai_api_key: str = ""
     max_context_tokens: int = 4000

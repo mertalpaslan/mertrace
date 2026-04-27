@@ -1,10 +1,15 @@
+import os
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from fastapi import BackgroundTasks
-from app.main import app
-from app.api.deps import engine
 from sqlmodel import SQLModel
+
+# Override DB to in-memory SQLite BEFORE any app imports resolve the engine
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+
+from app.main import app  # noqa: E402
+from app.api.deps import engine  # noqa: E402
 
 
 class NoOpBackgroundTasks(BackgroundTasks):
