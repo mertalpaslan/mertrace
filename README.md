@@ -4,19 +4,6 @@
 
 A full-stack AI engineering project that turns any Git repository into a searchable, conversational knowledge base. Built to demonstrate production-grade RAG architecture, local ML inference, real-time streaming, and agentic tool use — all in a single deployable system.
 
-## What This Project Demonstrates
-
-This is not a wrapper around a hosted AI API. Every technically interesting part runs locally:
-
-| Concern | Approach | Why it matters |
-|---|---|---|
-| **Code parsing** | tree-sitter AST (not regex, not line splits) | Extracts real symbols — functions, classes, methods — with exact line ranges |
-| **Embeddings** | `all-MiniLM-L6-v2` on CPU | Zero API cost, no rate limits, 384-dim vectors in ~5ms per chunk |
-| **Retrieval** | Dense (cosine) + BM25 fused via RRF | Hybrid search outperforms either method alone on code |
-| **Context assembly** | Token-budget packing with file grouping | Maximises LLM context quality within a hard token cap |
-| **Agentic mode** | 3-step linear agent with 4 tools | LLM explores the codebase before answering — no hallucinated paths |
-| **Streaming** | WebSocket token streaming + indexing progress | Real-time UX without polling |
-| **Visualisation** | UMAP + HDBSCAN → Observable Plot scatter | Entire codebase embedding space in 2D, colored by type/language/cluster |
 
 ## ✨ Features
 
@@ -42,11 +29,13 @@ This is not a wrapper around a hosted AI API. Every technically interesting part
 *Every answer links back to the exact file and line range. Click a citation to open the file preview with the relevant lines highlighted.*
 
 ### Agent Mode — Live Tool Execution
-![Agent Tool Calls](docs/screenshots/tool_use.png)
+<img src="docs/screenshots/tool_use.png" width="200" alt="Agent Tool Calls" />
+
 *In agent mode the LLM decides which tools to call, executes them against the real codebase, then synthesizes a grounded answer. Tool calls stream in real time.*
 
 ### Agent Mode — Tool Call Detail
-![Agent Tool Output](docs/screenshots/tool_use_2.png)
+<img src="docs/screenshots/tool_use_2.png" width="200" alt="Agent Tool Output" />
+
 *Each tool call card is expandable — showing the exact input sent to the tool, the output returned, and execution time in milliseconds.*
 
 ---
