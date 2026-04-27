@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 
 # ── SQLite async engine ────────────────────────────────────────────────────────
 engine = create_async_engine(
-    settings.database_url,
+    settings.abs_database_url,
     echo=settings.debug,
     connect_args={"check_same_thread": False},
 )
@@ -28,7 +28,7 @@ async def init_db() -> None:
     """Create all tables on startup."""
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
-    logger.info("Database initialised", extra={"url": settings.database_url})
+    logger.info("Database initialised", extra={"url": settings.abs_database_url})
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
