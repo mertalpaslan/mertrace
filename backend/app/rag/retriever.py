@@ -63,25 +63,17 @@ def retrieve(
         [semantic_results, bm25_results], top_k=top_k
     )
 
-    top_chunks = [
-        {
-            "file_path": c.file_path,
-            "start_line": c.start_line,
-            "symbol_name": c.symbol_name,
-            "chunk_type": c.chunk_type,
-            "score": c.score,
-            "text": c.text,
-        }
-        for c in fused[:5]
-    ]
-    log_retrieval(
-        project_id=project_id,
-        query=query,
-        semantic_count=len(semantic_results),
-        bm25_count=len(bm25_results),
-        fused_count=len(fused),
-        reranked_count=len(fused),
-        top_chunks=top_chunks,
+    logger.info(
+        "Retrieval fused",
+        extra={
+            "project_id": project_id,
+            "query_preview": query[:80],
+            "semantic": len(semantic_results),
+            "bm25": len(bm25_results),
+            "fused": len(fused),
+            "language_filter": language_filter,
+            "file_filter": file_filter,
+        },
     )
     return fused
 

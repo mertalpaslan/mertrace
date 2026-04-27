@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import time
 from app.rag.retriever import RetrievedChunk
-from app.core.logging import get_logger
+from app.core.logging import get_logger, log_retrieval
 
 logger = get_logger(__name__)
 
@@ -39,8 +40,13 @@ def rerank(
 
     ranker = get_reranker()
     if ranker is None:
-        logger.debug("Reranker unavailable, using retrieval order")
-        return chunks[:top_k]
+        logger.info(
+            "Reranker unavailable — using retrieval order",
+            extra={"input": len(chunks), "top_k": top_k},
+        )
+        result = chunks[:top_k]
+        _log_rerank_result(query, chunks, result)
+        return result
 
     try:
         from flashrank import RerankRequest
@@ -58,12 +64,38 @@ def rerank(
             chunk.score = float(r["score"])
             reranked.append(chunk)
 
-        logger.debug(
-            "Reranking complete",
-            extra={"input": len(chunks), "output": len(reranked)},
-        )
+        _log_rerank_result(query, chunks, reranked)
         return reranked
 
     except Exception as e:
         logger.warning("Reranking failed, using retrieval order", extra={"error": str(e)})
-        return chunks[:top_k]
+        result = chunks[:top_k]
+        _log_rerank_result(query, chunks, result)
+        return result
+
+
+def _log_rerank_result(
+    query: str,
+    before: list[RetrievedChunk],
+    after: list[RetrievedChunk],
+) -> None:
+    top_chunks = [
+        {
+            "file_path": c.file_path,
+            "start_line": c.start_line,
+            "symbol_name": c.symbol_name,
+            "chunk_type": c.chunk_type,
+            "score": c.score,
+            "text": c.text,
+        }
+        for c in after
+    ]
+    log_retrieval(
+        project_id=after[0].file_path.split("/")[0] if after else "unknown",
+        query=query,
+        semantic_count=len([c for c in before if c.source == "semantic"]),
+        bm25_count=len([c for c in before if c.source == "bm25"]),
+        fused_count=len(before),
+        reranked_count=len(after),
+        top_chunks=top_chunks,
+    )
